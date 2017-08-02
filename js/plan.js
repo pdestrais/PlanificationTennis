@@ -3,6 +3,7 @@ var players = [];
 var weeks =[];
 var i=0;
 var j=0;
+var sim3 = 0;
 var playerCounter=[];
 var table=[];
 var temperature;
@@ -13,7 +14,6 @@ function plan() {
 	var objective=1000;
 	var newObjective=1000;
 	temperature=100;
-	// setHolidays();
 	initializeTable();
 	var iteration=-1;
 	console.debug("ITERATION"+iteration+"[plan - after initialization]table is :"+JSON.stringify(table));
@@ -48,25 +48,9 @@ function plan() {
 	} while (objective>1 && iteration<300);
 	console.info("RESULTAT\n");
 	dumpTable();
-}
-
-function setHolidays() {
-		var offWeeks=[];
-		// joueur 0 est Thomas
-		offWeeks = [12,13,14,15,16];
-		holidays[0]=offWeeks;
-		// joueur 1 est Maxime
-		offWeeks = [12,13,14,15,16];
-		holidays[1]=offWeeks;
-		// joueur 2 est Gérald
-		offWeeks = [12,13];
-		holidays[2]=offWeeks;
-		// joueur 3 est Philippe
-		offWeeks = [4,5];
-		holidays[3]=offWeeks;
-		// joueur 4 est Sophie
-		offWeeks = [12,13];
-		holidays[4]=offWeeks;
+	// Calculate Similarity score of proposed solution
+	console.info("Similarity score : "+computeSimilarity());
+	console.info("sim3+ occurences : "+sim3);
 }
 
 function initializePlayers () {
@@ -81,7 +65,9 @@ function initializePlayers () {
 		{nom:"Thierry Dekoninck",numero:7,lettre:'H',holidays:[]},
 		{nom:"Pierre Destrais",numero:8,lettre:'I',holidays:[]},
 		{nom:"Pierre Halbrecq",numero:9,lettre:'J',holidays:[]},
-		{nom:"Bernard Vael",numero:10,lettre:'K',holidays:[]}
+		{nom:"Bernard Vael",numero:10,lettre:'K',holidays:[]},
+		{nom:"Laurent Lefevre",numero:11,lettre:'L',holidays:[]},
+		{nom:"Maxime Dekoninck",numero:12,lettre:'M',holidays:[12,13,14,15,16]}
 	];
 }
 
@@ -94,6 +80,58 @@ function dumpTable() {
 	for (i=0;i<weeks.length;i++) {
 		console.info("WEEK"+i+"\t"+mapNumberToLetter(table[i][0])+"\t"+mapNumberToLetter(table[i][1])+"\t"+mapNumberToLetter(table[i][2])+"\t"+mapNumberToLetter(table[i][3])+"\n");
 	}
+}
+
+function computeSimilarity() {
+	var stotal = 0;
+	sim3 = 0;
+	for (var i=2;i<weeks.length;i++) {
+//	for (var i=2;i<5;i++) {
+		stotal = stotal + similarity(i);
+	}	
+	return stotal;
+}
+
+function similarity(i) {
+	var sim = 0;
+	for (var j=i-1;j>=0;j--) {
+		sim = sim + simBetweenIteration(i,j);
+	}
+	return sim;
+}
+
+function simBetweenIteration(it1,it2) {
+	var s = 0;
+	var sweithed = 0;
+	for (var i=0;i<table[it1].length;i++) {
+		if (table[it2].includes(table[it1][i])) {
+			s++;
+			sweithed = sweithed + (1-(it1-it2)/weeks.length);
+		}
+	}
+	if (s>2) {
+		console.info("s = "+s+" between it "+it1+ " and "+it2+" | "+mapNumberToLetter(table[it1][0])+"-"+mapNumberToLetter(table[it1][1])+"-"+mapNumberToLetter(table[it1][2])+"-"+mapNumberToLetter(table[it1][3])+" AND "+mapNumberToLetter(table[it2][0])+"-"+mapNumberToLetter(table[it2][1])+"-"+mapNumberToLetter(table[it2][2])+"-"+mapNumberToLetter(table[it2][3]))
+		console.info("sweighted = "+sweithed+" between it "+it1+ " and "+it2+" | "+mapNumberToLetter(table[it1][0])+"-"+mapNumberToLetter(table[it1][1])+"-"+mapNumberToLetter(table[it1][2])+"-"+mapNumberToLetter(table[it1][3])+" AND "+mapNumberToLetter(table[it2][0])+"-"+mapNumberToLetter(table[it2][1])+"-"+mapNumberToLetter(table[it2][2])+"-"+mapNumberToLetter(table[it2][3]))
+		sim3 = sim3 + 1;
+	}
+	return sweithed;
+}
+
+function similarityCheck(table,i) {
+	var sim = 0;
+	for (var j=i-1;j>=0;j--) {
+		sim = sim + simBetweenArray(table[i],table[j]);
+	}
+	return sim;
+}
+
+function simBetweenArray(arr1,arr2) {
+	var s = 0;
+	for (var i=0;i<arr1.length;i++) {
+		if (arr2.includes(arr1[i]))
+			s++;
+	}
+	return s;
 }
 
 function resetPlayerCounter() {
@@ -156,10 +194,12 @@ function checkContraints(table) {
 			// si un des joueurs de cette semaine jouait déjà la semaine précédente, alors remplacer le joueur par un autre tiré au hazard.
 			if (table[i-1].indexOf(table[i][j])!=-1) {
 				do {
+					// selectioner un jouer au hazard
 					playerNum=selectRandomPlayer();
 					// playerNumHolidays = holidays[playerNum];
 					playerNumHolidays = players[playerNum].holidays;
 					if (playerNumHolidays===undefined) {playerNumHolidays=[];}
+					// retenir le joueur sélectionné par hazard si 1. il ne joue pas déjà la semaine courante, 2. ni la semaine d'avant, 3. et si il n'est pas en vacances 
 					if (table[i].indexOf(playerNum)==-1 && table[i-1].indexOf(playerNum)==-1 && playerNumHolidays.indexOf(i)==-1) {
 						table[i][j]=playerNum;
 						break;
@@ -241,9 +281,20 @@ function alterTable(playerToReplace) {
 				// playerNumHolidays = holidays[playerNum];
 				playerNumHolidays = players[playerNum].holidays;
 				if (playerNumHolidays===undefined) {playerNumHolidays=[];}
-				if (newTable[weeksToModif[i]].indexOf(playerNum)==-1 && newTable[(weeksToModif[i]-1)].indexOf(playerNum)==-1 && maxPlayers.indexOf(playerNum)==-1 && playerNumHolidays.indexOf(weeksToModif[i])==-1) {
+				// retenir le joueur sélectionné par hazard si 
+				// 		1. il ne joue pas déjà la semaine courante, 
+				//		2. ni la semaine d'avant, 
+				//		3. qu'il n'est pas dans la liste de joueurs jouant déjà le plus
+				//		4. et il n'est pas en vacances 
+				if (newTable[weeksToModif[i]].indexOf(playerNum)==-1 && 
+						newTable[(weeksToModif[i]-1)].indexOf(playerNum)==-1 && 
+						maxPlayers.indexOf(playerNum)==-1 && 
+						playerNumHolidays.indexOf(weeksToModif[i])==-1) {
 					console.debug("[alterTable]week : "+weeksToModif[i]+" - player "+newTable[weeksToModif[i]][indexPlayerToReplace]+" replaced by "+playerNum+ " - holiday for new player is :"+JSON.stringify(playerNumHolidays)+ "debug : "+newTable[(weeksToModif[i]-1)]);
 					newTable[weeksToModif[i]][indexPlayerToReplace]=playerNum;
+					// Si la similarité entre la semaine modifiée et une des semaines précédente est de 3, essayer de trouver un autre joueur
+					//if (similarityCheck(newTable,weeksToModif[i]) > 2)
+					//	continue;
 					break;
 				}
 				infiniteLoopProtection++;
